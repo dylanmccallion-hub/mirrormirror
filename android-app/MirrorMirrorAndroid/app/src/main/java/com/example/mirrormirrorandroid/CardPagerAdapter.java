@@ -1,0 +1,29 @@
+package com.example.mirrormirrorandroid;
+
+import androidx.annotation.NonNull;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+
+public class CardPagerAdapter extends FragmentStateAdapter {
+
+    public CardPagerAdapter(@NonNull FragmentActivity fragmentActivity) {
+        super(fragmentActivity);
+    }
+
+    @NonNull
+    @Override
+    public Fragment createFragment(int position) {
+        switch (position) {
+            case 0: return new MirrorStatusFragment();
+            case 1: return new ToDoListFragment();
+            case 2: return new MirrorSettingsFragment();
+            default: return new MirrorStatusFragment();
+        }
+    }
+
+    @Override
+    public int getItemCount() {
+        return 3; // number of cards/fragments
+    }
+}
