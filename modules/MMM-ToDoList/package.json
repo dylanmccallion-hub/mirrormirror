@@ -1,0 +1,10 @@
+{
+  "name": "MMM-ToDoList",
+  "version": "1.0.0",
+  "description": "Display To-Do list from Android app",
+  "main": "MMM-ToDoList.js",
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2"
+  }
+}
