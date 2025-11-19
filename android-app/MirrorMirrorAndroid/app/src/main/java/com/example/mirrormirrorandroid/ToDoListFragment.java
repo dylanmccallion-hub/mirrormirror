@@ -1,5 +1,6 @@
 package com.example.mirrormirrorandroid;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -124,6 +125,16 @@ public class ToDoListFragment extends Fragment {
         });
 
         submitListButton.setOnClickListener(v -> {
+            // Get selected mirror IP from SharedPreferences
+            String mirrorIp = requireActivity()
+                    .getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
+                    .getString("selectedMirrorIp", null);
+
+            if (mirrorIp == null) {
+                Toast.makeText(requireContext(), "No mirror selected", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             // Prepare JSON array of tasks
             JSONArray jsonArray = new JSONArray();
             for (ToDoItem item : items) {
@@ -144,12 +155,12 @@ public class ToDoListFragment extends Fragment {
                 e.printStackTrace();
             }
 
-            // Send REST POST to Raspberry Pi
+            // Send REST POST to the discovered mirror
             new Thread(() -> {
+                HttpURLConnection conn = null;
                 try {
-                    // Replace with your Pi's LAN IP
-                    URL url = new URL("http://192.168.3.159:8081/todolist");
-                    HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                    URL url = new URL("http://" + mirrorIp + ":8081/todolist");
+                    conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("POST");
                     conn.setRequestProperty("Content-Type", "application/json");
                     conn.setDoOutput(true);
@@ -161,10 +172,10 @@ public class ToDoListFragment extends Fragment {
 
                     int responseCode = conn.getResponseCode();
                     System.out.println("POST Response Code :: " + responseCode);
-
-                    conn.disconnect();
                 } catch (Exception e) {
                     e.printStackTrace();
+                } finally {
+                    if (conn != null) conn.disconnect();
                 }
             }).start();
 
