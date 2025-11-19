@@ -1,0 +1,60 @@
+/* Match MagicMirror look */
+.MMM-ToDoList {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #fff;
+  text-align: left;
+  line-height: 1.4em;
+}
+
+/* Header */
+.MMM-ToDoList .module-header {
+  font-size: 0.85em;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: #aaa;
+  border-bottom: 1px solid #666;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* List */
+.MMM-ToDoList ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Items */
+.MMM-ToDoList li {
+  font-size: 0.9em;
+  color: #fff;
+  padding: 2px 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Fade like default modules */
+.MMM-ToDoList li.dimmed {
+  color: #888;
+}
+
+/* Due date styling */
+.MMM-ToDoList .dueDate {
+  font-size: 0.75em;
+  color: #aaa;
+  transition: color 0.4s ease;
+}
+
+/* ⚠️ Due soon = yellow */
+.MMM-ToDoList .dueDate.due-soon {
+  color: #ffd966; /* light yellow */
+}
+
+/* 🔴 Overdue = subtle red */
+.MMM-ToDoList .dueDate.overdue {
+  color: #ff6666;
+}
+
+/* Align module width to others on the right */
+.region.right .MMM-ToDoList {
+  width: 250px;
+}
