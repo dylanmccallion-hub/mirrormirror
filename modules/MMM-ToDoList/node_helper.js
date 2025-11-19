@@ -1,44 +1,39 @@
 const NodeHelper = require("node_helper");
-const express = require("express");
+const io = require("socket.io-client");
 
 module.exports = NodeHelper.create({
-  list: [], // store the todo list
-
   start() {
-    console.log("✅ Starting MMM-ToDoList Node Helper");
+    console.log("🔗 MMM-ToDoList helper connected to central server");
 
-    const app = express();
-    app.use(express.json());
+    // Connect to central API websocket
+    this.socket = io("http://localhost:8081");
 
-    // --- REST endpoint for your Android app ---
-    app.post("/todolist", (req, res) => {
-      const newList = req.body.list || [];
-      console.log("📩 Received POST /todolist:", newList);
-
-      // Save and send to frontend
-      this.list = newList;
-      console.log("➡️ Sending TODO_LIST_UPDATE to frontend:", this.list);
-      this.sendSocketNotification("TODO_LIST_UPDATE", this.list);
-
-      res.json({ success: true });
+    this.socket.on("connect", () => {
+      console.log("🟢 Connected to central server via websocket");
     });
 
-    app.listen(8081, () => console.log("🚀 ToDo REST server running on port 8081"));
+    // Receive push update
+    this.socket.on("TODO_PUSH_UPDATE", (updatedList) => {
+      console.log("📥 PUSH UPDATE from server:", updatedList);
+
+      // Send to frontend
+      this.sendSocketNotification("TODO_LIST_UPDATE", updatedList);
+    });
   },
 
   socketNotificationReceived(notification, payload) {
-    console.log("Node Helper received:", notification, payload);
-
     if (notification === "GET_TODO_LIST") {
-      // Send the current list to frontend
-      console.log("➡️ Responding with current list:", this.list);
-      this.sendSocketNotification("TODO_LIST_UPDATE", this.list);
+      this.loadList();
     }
+  },
 
-    if (notification === "ADD_TODO") {
-      this.list.push(payload);
-      console.log("➡️ Added new todo, sending updated list:", this.list);
-      this.sendSocketNotification("TODO_LIST_UPDATE", this.list);
+  async loadList() {
+    try {
+      const res = await fetch("http://localhost:8081/todolist");
+      const list = await res.json();
+      this.sendSocketNotification("TODO_LIST_UPDATE", list);
+    } catch (err) {
+      console.error("Error loading list:", err);
     }
   }
 });
