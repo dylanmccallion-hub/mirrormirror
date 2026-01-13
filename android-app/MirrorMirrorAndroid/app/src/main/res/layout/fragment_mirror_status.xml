@@ -4,9 +4,9 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="382dp"
     android:layout_height="685dp"
-    app:cardCornerRadius="25sp"
-    app:cardBackgroundColor="#838383"
-    android:layout_gravity="center">
+    app:cardCornerRadius="25dp"
+    android:layout_gravity="center"
+    app:cardElevation="8dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -21,26 +21,39 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:gravity="center_horizontal">
 
-                <!-- Connection indicator -->
-                <View
-                    android:id="@+id/connectionIndicator"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:layout_marginBottom="10dp"
-                    android:background="@drawable/indicator_circle"
-                    android:layout_gravity="start"/>
-
-                <!-- Connection status -->
-                <TextView
-                    android:id="@+id/txtConnectionStatus"
-                    android:layout_width="wrap_content"
+                <!-- Connection indicator + status -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Status: Unknown"
-                    android:textSize="20sp"
-                    android:textColor="@color/white"
-                    android:textStyle="bold" />
+                    android:layout_marginBottom="10dp">
+
+                    <!-- Indicator in top-left corner -->
+                    <ImageView
+                        android:id="@+id/connectionIndicator"
+                        android:layout_width="35dp"
+                        android:layout_height="35dp"
+                        android:src="@drawable/indicator_red_gradient"
+                        android:scaleType="fitXY"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"/>
+
+                    <!-- Status text centered horizontally -->
+                    <TextView
+                        android:id="@+id/txtConnectionStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Status: Unknown"
+                        android:textColor="@color/white"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"/>
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <!-- Loading spinner -->
                 <ProgressBar
@@ -48,23 +61,24 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:visibility="gone" />
+                    android:visibility="gone"/>
 
                 <!-- Mirror selection -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Select a mirror:"
-                    android:textColor="@color/white"
                     android:layout_marginTop="20dp"
-                    android:textStyle="bold"/>
+                    android:gravity="center"
+                    android:text="Select a Mirror:"
+                    android:textColor="@color/white"
+                    android:textStyle="bold" />
 
                 <ListView
                     android:id="@+id/listViewMirrors"
                     android:layout_width="match_parent"
                     android:layout_height="150dp"
-                    android:divider="@android:color/darker_gray"
-                    android:dividerHeight="1dp"
+                    android:divider="@android:color/transparent"
+                    android:dividerHeight="0dp"
                     android:layout_marginTop="5dp"
                     android:scrollbars="vertical"/>
 
@@ -75,38 +89,47 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
                     android:text="ID: -"
-                    android:textColor="@color/white" />
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:gravity="center"/>
 
                 <TextView
                     android:id="@+id/txtIpAddress"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="IP: -"
-                    android:textColor="@color/white" />
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:gravity="center"/>
 
                 <TextView
                     android:id="@+id/txtUptime"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Uptime: -"
-                    android:textColor="@color/white" />
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:gravity="center"/>
 
                 <!-- Modules -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Modules installed:"
-                    android:textColor="@color/white"
                     android:layout_marginTop="20dp"
-                    android:textStyle="bold"/>
+                    android:gravity="center"
+                    android:text="Modules Installed:"
+                    android:textColor="@color/white"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/txtModules"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="-"
-                    android:paddingLeft="10dp"
-                    android:textColor="@color/white"/>
+                    android:paddingStart="10dp"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:gravity="center"/>
 
                 <!-- Last update -->
                 <TextView
@@ -114,8 +137,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="Last update: -"
-                    android:textColor="@color/white"/>
+                    android:gravity="center"
+                    android:text="Last Update: -"
+                    android:textColor="@color/white"
+                    android:textStyle="bold" />
             </LinearLayout>
         </ScrollView>
     </androidx.constraintlayout.widget.ConstraintLayout>

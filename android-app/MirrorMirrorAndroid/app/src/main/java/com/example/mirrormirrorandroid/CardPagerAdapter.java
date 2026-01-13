@@ -17,7 +17,7 @@ public class CardPagerAdapter extends FragmentStateAdapter {
         switch (position) {
             case 0: return new MirrorStatusFragment();
             case 1: return new ToDoListFragment();
-            case 2: return new MirrorSettingsFragment();
+            case 2: return new MirrorMapsFragment();
             default: return new MirrorStatusFragment();
         }
     }

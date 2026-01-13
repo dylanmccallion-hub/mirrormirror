@@ -1,12 +1,14 @@
 package com.example.mirrormirrorandroid;
 
 import android.content.Context;
-import android.graphics.Color;
+import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
 import android.widget.ArrayAdapter;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -33,7 +35,7 @@ import okhttp3.Response;
 public class MirrorStatusFragment extends Fragment {
 
     private TextView txtConnectionStatus, txtMirrorId, txtIpAddress, txtUptime, txtModules, txtLastUpdate;
-    private View connectionIndicator;
+    private ImageView connectionIndicator;
     private ProgressBar loading;
     private ListView listViewMirrors;
 
@@ -44,13 +46,45 @@ public class MirrorStatusFragment extends Fragment {
     private ArrayAdapter<String> adapter;
     private OkHttpClient client = new OkHttpClient();
 
+    private Handler handler = new Handler();
+    private String selectedMirrorIp = null;
+
     public MirrorStatusFragment() {
         super(R.layout.fragment_mirror_status);
     }
 
+    // Poll selected mirror every 5s to detect disconnects
+    private final Runnable statusPoller = new Runnable() {
+        @Override
+        public void run() {
+            if (selectedMirrorIp != null) {
+                Request request = new Request.Builder()
+                        .url("http://" + selectedMirrorIp + ":8081/status")
+                        .build();
+
+                client.newCall(request).enqueue(new Callback() {
+                    @Override
+                    public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                        if (getActivity() != null) {
+                            getActivity().runOnUiThread(() -> handleMirrorDisconnect());
+                        }
+                    }
+
+                    @Override
+                    public void onResponse(@NonNull Call call, @NonNull Response response) {
+                        if (!response.isSuccessful() && getActivity() != null) {
+                            getActivity().runOnUiThread(() -> handleMirrorDisconnect());
+                        }
+                    }
+                });
+            }
+            handler.postDelayed(this, 5000);
+        }
+    };
+
     private final NsdManager.DiscoveryListener discoveryListener = new NsdManager.DiscoveryListener() {
         @Override public void onDiscoveryStarted(String regType) {}
-        @Override public void onServiceFound(final NsdServiceInfo service) {
+        @Override public void onServiceFound(NsdServiceInfo service) {
             if (service.getServiceType().contains("_magicmirror._tcp")) {
                 nsdManager.resolveService(service, resolveListener);
             }
@@ -64,30 +98,25 @@ public class MirrorStatusFragment extends Fragment {
     private final NsdManager.ResolveListener resolveListener = new NsdManager.ResolveListener() {
         @Override public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {}
         @Override
-        public void onServiceResolved(final NsdServiceInfo serviceInfo) {
+        public void onServiceResolved(NsdServiceInfo serviceInfo) {
             if (getActivity() == null) return;
 
             getActivity().runOnUiThread(() -> {
                 String mirrorIp = serviceInfo.getHost().getHostAddress();
+                String mirrorName = serviceInfo.getServiceName();
 
-                // Save the discovered IP
-                requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
-                        .edit()
-                        .putString("selectedMirrorIp", mirrorIp)
-                        .apply();
+                // Add new mirror to list if not already present
+                if (!mirrorIps.contains(mirrorIp)) {
+                    mirrorNames.add(mirrorName);
+                    mirrorIps.add(mirrorIp);
+                    adapter.notifyDataSetChanged();
+                }
 
-                // Update UI
-                txtConnectionStatus.setText("Mirror Found: " + serviceInfo.getServiceName());
-                connectionIndicator.setBackgroundColor(Color.GREEN);
-
-                // Add to list and notify adapter
-                mirrorNames.add(serviceInfo.getServiceName());
-                mirrorIps.add(mirrorIp);
-                adapter.notifyDataSetChanged();
-
-                // Auto-select first discovered mirror
-                if (!mirrorFound.getAndSet(true)) {
-                    updateMirrorInfo(mirrorIp, serviceInfo.getServiceName());
+                // Only update status indicator if we’re not already connected
+                if (!mirrorIp.equals(selectedMirrorIp)) {
+                    txtConnectionStatus.setText("Mirror Found: " + mirrorName);
+                    setIndicatorState("searching");
+                    mirrorFound.set(true);
                 }
             });
         }
@@ -97,6 +126,7 @@ public class MirrorStatusFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        // --- Initialize UI ---
         txtConnectionStatus = view.findViewById(R.id.txtConnectionStatus);
         txtMirrorId = view.findViewById(R.id.txtMirrorId);
         txtIpAddress = view.findViewById(R.id.txtIpAddress);
@@ -107,39 +137,42 @@ public class MirrorStatusFragment extends Fragment {
         loading = view.findViewById(R.id.loading);
         listViewMirrors = view.findViewById(R.id.listViewMirrors);
 
-        adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_list_item_1, mirrorNames);
+        adapter = new ArrayAdapter<>(requireContext(), R.layout.list_items, R.id.txtMirrorName, mirrorNames);
         listViewMirrors.setAdapter(adapter);
 
         listViewMirrors.setOnItemClickListener((parent, itemView, position, id) -> {
-            String ip = mirrorIps.get(position);
-            updateMirrorInfo(ip, mirrorNames.get(position));
+            selectedMirrorIp = mirrorIps.get(position);
+            updateMirrorInfo(selectedMirrorIp, mirrorNames.get(position));
         });
 
         nsdManager = (NsdManager) requireContext().getSystemService(Context.NSD_SERVICE);
-        startDiscovery();
-    }
 
-    private void startDiscovery() {
-        mirrorFound.set(false);
-        if (nsdManager != null) {
-            nsdManager.discoverServices("_magicmirror._tcp", NsdManager.PROTOCOL_DNS_SD, discoveryListener);
-            txtConnectionStatus.setText("Searching for mirrors...");
-            setIndicatorColor(Color.YELLOW);
+        txtConnectionStatus.setText("Status: Disconnected");
+        setIndicatorState("disconnected");
+
+        // --- Restore last selected mirror ---
+        SharedPreferences prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
+        selectedMirrorIp = prefs.getString("selectedMirrorIp", null);
+
+        if (selectedMirrorIp != null) {
+            // Pre-fill list with placeholder
+            mirrorIps.add(selectedMirrorIp);
+            mirrorNames.add("Loading...");
+            adapter.notifyDataSetChanged();
+
+            // Try to reach the last selected mirror
+            verifyMirrorReachable(selectedMirrorIp);
+        } else {
+            // No saved mirror, start discovery
+            startDiscovery();
         }
+
+        // Start periodic polling
+        handler.post(statusPoller);
     }
 
-    private void updateMirrorInfo(String ip, String name) {
-        txtConnectionStatus.setText("Mirror Found: " + name);
-        setIndicatorColor(Color.GREEN);
-        loading.setVisibility(View.VISIBLE);
 
-        // Save selected IP
-        requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
-                .edit()
-                .putString("selectedMirrorIp", ip)
-                .apply();
-
-        // Fetch /status
+    private void verifyMirrorReachable(String ip) {
         Request request = new Request.Builder()
                 .url("http://" + ip + ":8081/status")
                 .build();
@@ -147,24 +180,82 @@ public class MirrorStatusFragment extends Fragment {
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                e.printStackTrace();
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        loading.setVisibility(View.GONE);
-                        Toast.makeText(getContext(), "Failed to fetch mirror status", Toast.LENGTH_SHORT).show();
+                        handleMirrorDisconnect();
+                        mirrorNames.clear();  // remove any placeholder
+                        mirrorIps.clear();
+                        adapter.notifyDataSetChanged();
+                        startDiscovery();    // restart discovery automatically
                     });
                 }
             }
 
             @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                final String body = response.body() != null ? response.body().string() : "{}";
+            public void onResponse(@NonNull Call call, @NonNull Response response) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (response.isSuccessful()) {
+                            updateMirrorInfo(ip, "Last Selected Mirror");
+                        } else {
+                            handleMirrorDisconnect();
+                            mirrorNames.clear();
+                            mirrorIps.clear();
+                            adapter.notifyDataSetChanged();
+                            startDiscovery();
+                        }
+                    });
+                }
+            }
+        });
+    }
 
+
+    private void handleMirrorDisconnect() {
+        selectedMirrorIp = null;
+        SharedPreferences prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
+        prefs.edit().remove("selectedMirrorIp").remove("selectedMirrorName").apply();
+
+        txtConnectionStatus.setText("Status: Disconnected");
+        setIndicatorState("disconnected");
+    }
+
+    private void startDiscovery() {
+        mirrorFound.set(false);
+        if (nsdManager != null) {
+            nsdManager.discoverServices("_magicmirror._tcp", NsdManager.PROTOCOL_DNS_SD, discoveryListener);
+        }
+    }
+
+    private void updateMirrorInfo(String ip, String name) {
+        txtConnectionStatus.setText("Connected to: " + name);
+        setIndicatorState("connected");
+        loading.setVisibility(View.VISIBLE);
+
+        SharedPreferences prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
+        prefs.edit().putString("selectedMirrorIp", ip).putString("selectedMirrorName", name).apply();
+
+        Request request = new Request.Builder()
+                .url("http://" + ip + ":8081/status")
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        loading.setVisibility(View.GONE);
+                        handleMirrorDisconnect();
+                        Toast.makeText(getContext(), "Failed to fetch mirror status", Toast.LENGTH_SHORT).show();
+                    });
+                }
+            }
+
+            @Override public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                final String body = response.body() != null ? response.body().string() : "{}";
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         try {
                             JSONObject json = new JSONObject(body);
-
                             txtMirrorId.setText("ID: " + json.optString("id", "-"));
                             txtIpAddress.setText("IP: " + json.optString("ip", ip));
                             txtUptime.setText("Uptime: " + json.optString("uptime", "-"));
@@ -180,13 +271,9 @@ public class MirrorStatusFragment extends Fragment {
                                 txtModules.setText("-");
                             }
 
-                            txtLastUpdate.setText("Last update: " + json.optString("lastUpdate", "-"));
-
+                            txtLastUpdate.setText("Last Update: " + json.optString("lastUpdate", "-"));
                         } catch (Exception e) {
                             e.printStackTrace();
-                            txtModules.setText("-");
-                            txtUptime.setText("-");
-                            txtLastUpdate.setText("-");
                         } finally {
                             loading.setVisibility(View.GONE);
                         }
@@ -196,10 +283,25 @@ public class MirrorStatusFragment extends Fragment {
         });
     }
 
+    private void setIndicatorState(String state) {
+        switch (state) {
+            case "disconnected":
+                connectionIndicator.setImageResource(R.drawable.indicator_red_gradient);
+                break;
+            case "searching":
+                connectionIndicator.setImageResource(R.drawable.indicator_yellow_gradient);
+                break;
+            case "connected":
+                connectionIndicator.setImageResource(R.drawable.indicator_green_gradient);
+                break;
+        }
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         stopDiscovery();
+        handler.removeCallbacks(statusPoller);
     }
 
     private void stopDiscovery() {
@@ -208,9 +310,5 @@ public class MirrorStatusFragment extends Fragment {
                 nsdManager.stopServiceDiscovery(discoveryListener);
             } catch (IllegalArgumentException ignored) {}
         }
-    }
-
-    private void setIndicatorColor(int color) {
-        connectionIndicator.setBackgroundColor(color);
     }
 }

@@ -27,9 +27,12 @@ public class FloatingInputDialog extends DialogFragment {
 
     private OnSubmitListener listener;
     private String selectedDueDate = null;
+    private int layoutResId; // <-- NEW
 
-    public FloatingInputDialog(OnSubmitListener listener) {
+    // Constructor with layout
+    public FloatingInputDialog(OnSubmitListener listener, int layoutResId) {
         this.listener = listener;
+        this.layoutResId = layoutResId;
     }
 
     @NonNull
@@ -37,27 +40,30 @@ public class FloatingInputDialog extends DialogFragment {
     public Dialog onCreateDialog(@Nullable Bundle savedInstanceState) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireActivity());
         LayoutInflater inflater = requireActivity().getLayoutInflater();
-        View view = inflater.inflate(R.layout.floating_input_bar, null);
+
+        // Inflate the layout you pass in
+        View view = inflater.inflate(layoutResId, null);
 
         final EditText editText = view.findViewById(R.id.editTextItem);
         Button btnSubmit = view.findViewById(R.id.btnSubmit);
+
+        // Only try to find btnSetDueDate if it exists
         Button btnSetDueDate = view.findViewById(R.id.btnSetDueDate);
+        if (btnSetDueDate != null) {
+            btnSetDueDate.setOnClickListener(v -> {
+                Calendar calendar = Calendar.getInstance();
+                DatePickerDialog datePicker = new DatePickerDialog(requireContext(),
+                        R.style.DatePickerLight,
+                        (dpView, year, month, dayOfMonth) -> {
+                            selectedDueDate = dayOfMonth + "/" + (month + 1) + "/" + year;
+                        },
+                        calendar.get(Calendar.YEAR),
+                        calendar.get(Calendar.MONTH),
+                        calendar.get(Calendar.DAY_OF_MONTH));
+                datePicker.show();
+            });
+        }
 
-        // --- Set up date picker ---
-        btnSetDueDate.setOnClickListener(v -> {
-            Calendar calendar = Calendar.getInstance();
-            DatePickerDialog datePicker = new DatePickerDialog(requireContext(),
-                    R.style.DatePickerLight,
-                    (dpView, year, month, dayOfMonth) -> {
-                        selectedDueDate = dayOfMonth + "/" + (month + 1) + "/" + year;
-                    },
-                    calendar.get(Calendar.YEAR),
-                    calendar.get(Calendar.MONTH),
-                    calendar.get(Calendar.DAY_OF_MONTH));
-            datePicker.show();
-        });
-
-        // --- Submit button ---
         btnSubmit.setOnClickListener(v -> {
             String text = editText.getText().toString().trim();
             if (!text.isEmpty() && listener != null) {
@@ -68,8 +74,6 @@ public class FloatingInputDialog extends DialogFragment {
 
         builder.setView(view);
         Dialog dialog = builder.create();
-
-        // --- Configure dialog window ---
         dialog.getWindow().setGravity(Gravity.BOTTOM);
         dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT,
@@ -77,7 +81,6 @@ public class FloatingInputDialog extends DialogFragment {
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING |
                 WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
 
-        // --- Show keyboard immediately ---
         editText.requestFocus();
         editText.post(() -> {
             InputMethodManager imm = (InputMethodManager) requireContext()
@@ -88,3 +91,4 @@ public class FloatingInputDialog extends DialogFragment {
         return dialog;
     }
 }
+

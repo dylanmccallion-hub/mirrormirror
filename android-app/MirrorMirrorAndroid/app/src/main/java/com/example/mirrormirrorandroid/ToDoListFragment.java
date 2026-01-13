@@ -120,8 +120,10 @@ public class ToDoListFragment extends Fragment {
             FloatingInputDialog dialog = new FloatingInputDialog((text, dueDate) -> {
                 items.add(new ToDoItem(text, dueDate));
                 adapter.notifyDataSetChanged();
-            });
-            dialog.show(getParentFragmentManager(), "floating_input");
+            },
+                    R.layout.floating_input_bar
+            );
+            dialog.show(getParentFragmentManager(), "floating_input_bar");
         });
 
         submitListButton.setOnClickListener(v -> {
