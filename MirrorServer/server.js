@@ -64,12 +64,41 @@ app.get("/status", (req, res) => {
     id: MIRROR_ID,
     ip: localIp,
     uptime: `${hours}h ${minutes}m`,
-    modules: ["MMM-TodoList"], // you can add more module names here
+    modules: ["MMM-ToDoList", "MMM-RoutePlanner"], // you can add more module names here
     lastUpdate: new Date().toISOString()
   };
 
   res.json(status);
 });
+
+// server.js
+let routeInfo = {}; // store the latest route info
+
+// Android sends route info
+// server.js — updated POST /route
+app.post("/route", (req, res) => {
+  const { distance, travelTime, route } = req.body; // <— get the origin->destination string
+
+  if (!distance || !travelTime || !route) {
+    return res.status(400).json({ success: false, message: "Missing distance, travelTime or route" });
+  }
+
+  // Save the full info including origin->destination
+  routeInfo = {
+    distance,
+    travelTime,
+    route, // <— this is the origin -> destination string
+    lastUpdate: new Date().toISOString()
+  };
+
+  console.log("Updated route info:", routeInfo);
+
+  // PUSH update to MagicMirror
+  io.emit("ROUTE_PUSH_UPDATE", routeInfo);
+
+  res.json({ success: true });
+});
+
 
 // --- Start HTTP server ---
 server.listen(8081, () => {

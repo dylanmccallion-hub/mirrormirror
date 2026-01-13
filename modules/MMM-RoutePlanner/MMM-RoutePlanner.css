@@ -1,0 +1,44 @@
+/* Match MagicMirror look */
+.MMM-RoutePlanner {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #fff;
+  text-align: left;
+  line-height: 1.4em;
+}
+
+/* Header */
+.MMM-RoutePlanner .module-header {
+  font-size: 0.85em;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: #aaa;
+  border-bottom: 1px solid #666;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* List */
+.MMM-RoutePlanner ul {
+  list-style: none;
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Items */
+.MMM-RoutePlanner li {
+  font-size: 0.9em;
+  color: #fff;
+  padding: 2px 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Dimmed rows */
+.MMM-RoutePlanner li.dimmed {
+  color: #888;
+}
+
+/* Align module width to others on the right */
+.region.right .MMM-RoutePlanner {
+  width: 250px;
+}
