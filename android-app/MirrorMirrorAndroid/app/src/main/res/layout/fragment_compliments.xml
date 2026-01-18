@@ -1,21 +1,15 @@
 <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     app:cardCornerRadius="25sp"
     app:cardBackgroundColor="#838383"
     android:layout_gravity="center">
 
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/formConstraintLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/gradient_card_view">
-
-        <!-- Add button at the top -->
-
-        <!-- ListView fills between Add and Submit List buttons -->
 
         <Button
             android:id="@+id/btnAdd"
@@ -36,13 +30,12 @@
             android:id="@+id/listView"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            app:layout_constraintTop_toBottomOf="@+id/btnAdd"
-            app:layout_constraintBottom_toTopOf="@+id/submitListButton"
+            app:layout_constraintTop_toBottomOf="@id/btnAdd"
+            app:layout_constraintBottom_toTopOf="@id/submitButton"
             android:dividerHeight="4dp" />
 
-        <!-- Submit List button stays at the bottom -->
         <Button
-            android:id="@+id/submitListButton"
+            android:id="@+id/submitButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="32dp"

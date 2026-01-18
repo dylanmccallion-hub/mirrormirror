@@ -13,7 +13,8 @@ public class MainActivity extends AppCompatActivity {
 
     private ViewPager2 viewPager;
     private TabLayout tabLayout;
-    private final String[] tabTitles = new String[]{"Status", "To-Do List", "Maps"};
+    private final String[] tabTitles =
+            new String[]{"Status", "To-Do List", "Maps", "Comps", "Health"};
 
 
     @Override

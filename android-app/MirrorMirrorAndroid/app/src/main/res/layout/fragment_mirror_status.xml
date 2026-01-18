@@ -117,7 +117,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
                     android:gravity="center"
-                    android:text="Modules Installed:"
+                    android:text="Modules Active:"
                     android:textColor="@color/white"
                     android:textStyle="bold" />
 
@@ -141,6 +141,22 @@
                     android:text="Last Update: -"
                     android:textColor="@color/white"
                     android:textStyle="bold" />
+
+                <!-- City selection -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:gravity="center"
+                    android:text="Select a City:"
+                    android:textColor="@color/white"
+                    android:textStyle="bold" />
+
+                <Spinner
+                    android:id="@+id/spinnerCities"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="5dp"/>
             </LinearLayout>
         </ScrollView>
     </androidx.constraintlayout.widget.ConstraintLayout>
