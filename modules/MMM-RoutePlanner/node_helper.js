@@ -31,8 +31,18 @@ module.exports = NodeHelper.create({
   async loadRoute() {
     try {
       const res = await fetch("http://localhost:8081/route");
-      const route = await res.json();
+
+      const text = await res.text();
+
+      // If backend returned HTML or non-JSON, ignore it
+      if (!res.ok || text.trim().startsWith("<")) {
+        console.error("RoutePlanner backend returned non-JSON:", text.slice(0, 200));
+        return;
+      }
+
+      const route = JSON.parse(text);
       this.sendSocketNotification("ROUTE_INFO_UPDATE", route);
+
     } catch (err) {
       console.error("Error loading route:", err);
     }

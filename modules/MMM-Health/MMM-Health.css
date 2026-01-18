@@ -1,0 +1,43 @@
+/* Match MagicMirror look */
+.MMM-Health {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #fff;
+  text-align: left;
+  line-height: 1.4em;
+}
+
+/* Header */
+.MMM-Health .module-header {
+  font-size: 0.85em;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: #aaa;
+  border-bottom: 1px solid #666;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* List */
+.MMM-Health ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Items */
+.MMM-Health li {
+  font-size: 0.9em;
+  color: #fff;
+  padding: 2px 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Dimmed rows (optional if you fade) */
+.MMM-Health li.dimmed {
+  color: #888;
+}
+
+/* Align module width to others on the right */
+.region.right .MMM-Health {
+  width: 250px;
+}

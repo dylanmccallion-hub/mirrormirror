@@ -64,7 +64,7 @@ app.get("/status", (req, res) => {
     id: MIRROR_ID,
     ip: localIp,
     uptime: `${hours}h ${minutes}m`,
-    modules: ["MMM-ToDoList", "MMM-RoutePlanner"], // you can add more module names here
+    modules: ["Calendar", "Clock", "Compliments", "NewsFeed", "Weather", "ToDoList", "RoutePlanner"],
     lastUpdate: new Date().toISOString()
   };
 
@@ -97,6 +97,61 @@ app.post("/route", (req, res) => {
   io.emit("ROUTE_PUSH_UPDATE", routeInfo);
 
   res.json({ success: true });
+});
+
+let selectedLocation = { city: "New York", lat: 40.776676, lon: -73.971321 }; // default
+
+app.post("/location", (req, res) => {
+  const { city, lat, lon } = req.body;
+
+  if (typeof lat !== "number" || typeof lon !== "number") {
+    return res.status(400).json({ success: false, message: "Missing or invalid lat/lon" });
+  }
+
+  selectedLocation = {
+    city: city || selectedLocation.city,
+    lat,
+    lon
+  };
+
+  console.log("Updated location:", selectedLocation);
+
+  // Push update to MagicMirror
+  io.emit("WEATHER_LOCATION_UPDATE", {
+    lat: selectedLocation.lat,
+    lon: selectedLocation.lon,
+    location: selectedLocation.city
+  });
+
+  res.json({ success: true });
+});
+
+let complimentsList = [];
+
+app.post("/compliments", (req, res) => {
+    complimentsList = req.body.list || [];
+    console.log("Updated compliments list:", complimentsList);
+
+    io.emit("COMPLIMENTS_PUSH_UPDATE", complimentsList);
+    res.json({ success: true });
+});
+
+// Optional GET to fetch last known list
+app.get("/compliments", (req, res) => {
+    res.json(complimentsList);
+});
+
+let healthData = {};
+
+app.post("/health", (req, res) => {
+    healthData = req.body || {};
+    console.log("Updated health data:", healthData);
+    io.emit("HEALTH_PUSH_UPDATE", healthData);
+    res.json({ success: true });
+});
+
+app.get("/health", (req, res) => {
+    res.json(healthData);
 });
 
 

@@ -35,7 +35,7 @@ Module.register("MMM-RoutePlanner", {
     if (!this.loaded) {
       const loading = document.createElement("div");
       loading.className = "dimmed light small";
-      loading.innerHTML = "Loading ...";
+      loading.innerHTML = "Waiting for route ...";
       wrapper.appendChild(loading);
       return wrapper;
     }
