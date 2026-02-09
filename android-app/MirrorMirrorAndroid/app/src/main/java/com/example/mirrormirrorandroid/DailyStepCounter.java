@@ -22,11 +22,18 @@ public class DailyStepCounter implements SensorEventListener {
     private static final String KEY_LAST_DAY = "last_day";
 
     public DailyStepCounter(Context ctx) {
-        this.context = ctx;
+        context = ctx;
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
         stepCounterSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
-        sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_NORMAL);
+
+        if (stepCounterSensor == null) {
+            Log.e("DailyStepCounter", "Step counter sensor not available!");
+        }
+    }
+
+    public boolean hasSensor() {
+        return stepCounterSensor != null;
     }
 
     @Override
@@ -65,11 +72,35 @@ public class DailyStepCounter implements SensorEventListener {
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) { }
 
+    public void start() {
+        if (stepCounterSensor != null) {
+            sensorManager.registerListener(this, stepCounterSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        }
+    }
+
+    public void stop() {
+        sensorManager.unregisterListener(this);
+    }
+
+
     public int getStepsToday() {
         return prefs.getInt(KEY_STEPS_TODAY, 0);
     }
 
-    public int getCaloriesToday() {
-        return (int) (getStepsToday() * 0.04); // adjust if you want a more accurate formula
+    public int getCaloriesToday(float weightKg, float heightCm) {
+        int steps = getStepsToday();
+
+        // Approximate step length in meters
+        double stepLengthMeters = heightCm * 0.415 / 100.0;
+        double distanceKm = stepLengthMeters * steps / 1000.0;
+
+        double walkingSpeedKmh = 5.0; // average walking speed
+        double durationHours = distanceKm / walkingSpeedKmh;
+
+        double met = 3.5; // average MET for walking
+        double calories = met * weightKg * durationHours;
+
+        return (int) calories;
     }
+
 }
