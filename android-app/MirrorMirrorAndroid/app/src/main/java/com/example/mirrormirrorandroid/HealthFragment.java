@@ -29,9 +29,14 @@ public class HealthFragment extends Fragment {
 
     private TextView stepsText, caloriesText;
     private EditText heightInput, weightInput;
-    private Button submitButton;
 
     private DailyStepCounter dailyStepCounter;
+
+    // Keep track of last values sent to mirror
+    private int lastSteps = -1;
+    private int lastCalories = -1;
+    private float lastHeight = -1;
+    private float lastWeight = -1;
 
     public HealthFragment() {
         super(R.layout.fragment_health);
@@ -45,7 +50,6 @@ public class HealthFragment extends Fragment {
         caloriesText = view.findViewById(R.id.caloriesText);
         heightInput = view.findViewById(R.id.heightInput);
         weightInput = view.findViewById(R.id.weightInput);
-        submitButton = view.findViewById(R.id.submitButton);
 
         dailyStepCounter = new DailyStepCounter(requireContext());
 
@@ -67,22 +71,16 @@ public class HealthFragment extends Fragment {
 
         setupTextWatchers();
         updateHealthUI();
-
-        submitButton.setOnClickListener(v -> sendDataToMirror());
     }
 
     private void setupTextWatchers() {
         TextWatcher watcher = new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
-
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void afterTextChanged(Editable s) {}
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 updateHealthUI();
             }
-
-            @Override
-            public void afterTextChanged(Editable s) { }
         };
 
         heightInput.addTextChangedListener(watcher);
@@ -100,32 +98,33 @@ public class HealthFragment extends Fragment {
 
         stepsText.setText("Steps Today: " + stepsToday);
         caloriesText.setText("Calories: " + caloriesToday);
+
+        // Only send if values have changed
+        if (stepsToday != lastSteps || caloriesToday != lastCalories
+                || height != lastHeight || weight != lastWeight) {
+
+            sendDataToMirror(stepsToday, caloriesToday, height, weight);
+
+            lastSteps = stepsToday;
+            lastCalories = caloriesToday;
+            lastHeight = height;
+            lastWeight = weight;
+        }
     }
 
-    private void sendDataToMirror() {
-        int stepsToday = dailyStepCounter.getStepsToday();
-
-        float height = 170f, weight = 70f;
-        try { height = Float.parseFloat(heightInput.getText().toString()); } catch (Exception ignored){}
-        try { weight = Float.parseFloat(weightInput.getText().toString()); } catch (Exception ignored){}
-
-        int caloriesToday = dailyStepCounter.getCaloriesToday(weight, height);
-
+    private void sendDataToMirror(int steps, int calories, float height, float weight) {
         String mirrorIp = requireActivity()
                 .getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
                 .getString("selectedMirrorIp", null);
 
-        if (mirrorIp == null) {
-            Toast.makeText(requireContext(), "No mirror selected", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        if (mirrorIp == null) return;
 
         JSONObject payload = new JSONObject();
         try {
-            payload.put("steps", stepsToday);
-            payload.put("calories", caloriesToday);
-            payload.put("height", height);  // <-- send height
-            payload.put("weight", weight);  // <-- send weight
+            payload.put("steps", steps);
+            payload.put("calories", calories);
+            payload.put("height", height);
+            payload.put("weight", weight);
         } catch (Exception e) { e.printStackTrace(); }
 
         new Thread(() -> {
@@ -147,8 +146,6 @@ public class HealthFragment extends Fragment {
             } catch (Exception e) { e.printStackTrace(); }
             finally { if (conn != null) conn.disconnect(); }
         }).start();
-
-        Toast.makeText(requireContext(), "Health data sent to Mirror", Toast.LENGTH_SHORT).show();
     }
 
     @Override
