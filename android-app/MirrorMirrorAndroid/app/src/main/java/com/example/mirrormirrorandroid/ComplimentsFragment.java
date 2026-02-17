@@ -1,6 +1,7 @@
 package com.example.mirrormirrorandroid;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,10 +26,12 @@ import java.util.ArrayList;
 
 public class ComplimentsFragment extends Fragment {
 
-    private Button btnAdd, submitButton;
+    private Button btnAdd;
     private ListView listView;
     private ArrayList<String> compliments;
     private ArrayAdapter<String> adapter;
+
+    private SharedPreferences prefs;
 
     public ComplimentsFragment() {
         super(R.layout.fragment_compliments);
@@ -39,10 +42,22 @@ public class ComplimentsFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         btnAdd = view.findViewById(R.id.btnAdd);
-        submitButton = view.findViewById(R.id.submitButton);
         listView = view.findViewById(R.id.listView);
+        prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
 
+        // --- Load saved compliments ---
         compliments = new ArrayList<>();
+        String savedJson = prefs.getString("complimentsList", null);
+        if (savedJson != null) {
+            try {
+                JSONArray array = new JSONArray(savedJson);
+                for (int i = 0; i < array.length(); i++) {
+                    compliments.add(array.getString(i));
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
 
         adapter = new ArrayAdapter<String>(requireContext(), R.layout.list_item_compliments, compliments) {
             @NonNull
@@ -52,81 +67,76 @@ public class ComplimentsFragment extends Fragment {
                 if (itemView == null) {
                     itemView = getLayoutInflater().inflate(R.layout.list_item_compliments, parent, false);
                 }
-
                 TextView title = itemView.findViewById(R.id.itemTitle);
                 title.setText(compliments.get(position));
-
                 return itemView;
             }
         };
 
         listView.setAdapter(adapter);
 
-        // Add new compliment
+        // --- Add new compliment ---
         btnAdd.setOnClickListener(v -> {
             FloatingInputDialog dialog = new FloatingInputDialog((text, ignored) -> {
                 compliments.add(text);
                 adapter.notifyDataSetChanged();
+                saveCompliments(); // save immediately
+                sendToMirror();    // send immediately
             }, R.layout.floating_input_maps);
             dialog.show(getParentFragmentManager(), "floating_input_maps");
         });
 
-        // Submit to Mirror
-        submitButton.setOnClickListener(v -> {
-            String mirrorIp = requireActivity()
-                    .getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
-                    .getString("selectedMirrorIp", null);
-
-            if (mirrorIp == null) {
-                Toast.makeText(requireContext(), "No mirror selected", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            JSONArray jsonArray = new JSONArray();
-            for (String comp : compliments) {
-                jsonArray.put(comp);
-            }
-
-            JSONObject payload = new JSONObject();
-            try {
-                payload.put("list", jsonArray);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            // POST to server
-            new Thread(() -> {
-                HttpURLConnection conn = null;
-                try {
-                    URL url = new URL("http://" + mirrorIp + ":8081/compliments");
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setDoOutput(true);
-
-                    OutputStream os = conn.getOutputStream();
-                    os.write(payload.toString().getBytes());
-                    os.flush();
-                    os.close();
-
-                    int responseCode = conn.getResponseCode();
-                    System.out.println("POST Response Code :: " + responseCode);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    if (conn != null) conn.disconnect();
-                }
-            }).start();
-
-            Toast.makeText(requireContext(), "Compliments sent to Mirror", Toast.LENGTH_SHORT).show();
-        });
-
-        // Long press to delete
+        // --- Long press to delete ---
         listView.setOnItemLongClickListener((parent, v1, position, id) -> {
             String removed = compliments.remove(position);
             adapter.notifyDataSetChanged();
+            saveCompliments();
+            sendToMirror();
             Toast.makeText(requireContext(), "Deleted: " + removed, Toast.LENGTH_SHORT).show();
             return true;
         });
+
+        // --- Send saved list to mirror immediately on launch ---
+        sendToMirror();
+    }
+
+    private void saveCompliments() {
+        JSONArray array = new JSONArray();
+        for (String comp : compliments) array.put(comp);
+        prefs.edit().putString("complimentsList", array.toString()).apply();
+    }
+
+    private void sendToMirror() {
+        String mirrorIp = prefs.getString("selectedMirrorIp", null);
+        if (mirrorIp == null || compliments.isEmpty()) return;
+
+        JSONArray jsonArray = new JSONArray();
+        for (String comp : compliments) jsonArray.put(comp);
+
+        JSONObject payload = new JSONObject();
+        try { payload.put("list", jsonArray); } catch (JSONException e) { e.printStackTrace(); }
+
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL("http://" + mirrorIp + ":8081/compliments");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(payload.toString().getBytes());
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                System.out.println("POST Response Code :: " + responseCode);
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
     }
 }

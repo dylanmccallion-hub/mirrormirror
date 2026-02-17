@@ -38,6 +38,10 @@ public class HealthFragment extends Fragment {
     private float lastHeight = -1;
     private float lastWeight = -1;
 
+    private static final String PREFS_NAME = "HealthPrefs";
+    private static final String KEY_HEIGHT = "height";
+    private static final String KEY_WEIGHT = "weight";
+
     public HealthFragment() {
         super(R.layout.fragment_health);
     }
@@ -52,6 +56,14 @@ public class HealthFragment extends Fragment {
         weightInput = view.findViewById(R.id.weightInput);
 
         dailyStepCounter = new DailyStepCounter(requireContext());
+
+        // --- Load saved height and weight ---
+        SharedPreferences prefs = requireActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        float savedHeight = prefs.getFloat(KEY_HEIGHT, 170f);
+        float savedWeight = prefs.getFloat(KEY_WEIGHT, 70f);
+
+        heightInput.setText(String.valueOf(savedHeight));
+        weightInput.setText(String.valueOf(savedWeight));
 
         if (!dailyStepCounter.hasSensor()) {
             Toast.makeText(requireContext(),
@@ -98,6 +110,13 @@ public class HealthFragment extends Fragment {
 
         stepsText.setText("Steps Today: " + stepsToday);
         caloriesText.setText("Calories: " + caloriesToday);
+
+        // --- Persist height and weight ---
+        SharedPreferences prefs = requireActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit()
+                .putFloat(KEY_HEIGHT, height)
+                .putFloat(KEY_WEIGHT, weight)
+                .apply();
 
         // Only send if values have changed
         if (stepsToday != lastSteps || caloriesToday != lastCalories

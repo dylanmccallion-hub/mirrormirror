@@ -1,6 +1,7 @@
 package com.example.mirrormirrorandroid;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
@@ -9,6 +10,7 @@ import android.os.Handler;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.ProgressBar;
@@ -19,6 +21,14 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.Scope;
+import com.google.android.gms.tasks.Task;
+import com.google.api.services.calendar.CalendarScopes;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -53,6 +63,11 @@ public class MirrorStatusFragment extends Fragment {
 
     private Handler handler = new Handler();
     private String selectedMirrorIp = null;
+
+    private Button btnConnectGoogle;
+    private GoogleSignInClient mGoogleSignInClient;
+    private static final int RC_SIGN_IN = 1001;
+
 
     private Spinner spinnerCities;
     private final String[] cities = {
@@ -198,6 +213,13 @@ public class MirrorStatusFragment extends Fragment {
             }
         });
 
+        // --- Google Sign-In setup ---
+        btnConnectGoogle = view.findViewById(R.id.btnConnectGoogle);
+        setupGoogleSignIn();
+
+        btnConnectGoogle.setOnClickListener(v -> signInToGoogle());
+
+
 
         // --- Restore last selected mirror ---
 //        selectedMirrorIp = prefs.getString("selectedMirrorIp", null);
@@ -216,31 +238,35 @@ public class MirrorStatusFragment extends Fragment {
 //        }
         startDiscovery();
 
+        // --- Setup spinner ---
         ArrayAdapter<String> cityAdapter = new ArrayAdapter<>(
                 requireContext(),
-                R.layout.spinner_item_dark,  // custom row
+                R.layout.spinner_item_dark,
                 R.id.txtSpinnerItem,
                 cities
         );
         cityAdapter.setDropDownViewResource(R.layout.spinner_item_dark);
         spinnerCities.setAdapter(cityAdapter);
-
-// Set a dark semi-transparent background for the popup
         spinnerCities.setPopupBackgroundResource(R.drawable.spinner_popup_background_dark);
 
-
-        // Restore last selected city
-        String lastCity = "New York"; // default
+// Restore last selected city
+        SharedPreferences prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
+        String lastCity = prefs.getString("selectedCity", "New York");
         int position = java.util.Arrays.asList(cities).indexOf(lastCity);
         spinnerCities.setSelection(position);
 
+// City selection listener
         spinnerCities.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
                 String selectedCity = cities[pos];
 
+                // Persist selection
+                prefs.edit().putString("selectedCity", selectedCity).apply();
+
+                // Send location to mirror if one is selected
                 if (selectedMirrorIp != null) {
-                    updateMirrorLocation(selectedMirrorIp, selectedCity); // sends lat/lon and city
+                    updateMirrorLocation(selectedMirrorIp, selectedCity);
                 }
             }
 
@@ -253,6 +279,48 @@ public class MirrorStatusFragment extends Fragment {
         // Start periodic polling
         handler.post(statusPoller);
     }
+
+    private void setupGoogleSignIn() {
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestScopes(new Scope(CalendarScopes.CALENDAR_READONLY))
+                .build();
+        mGoogleSignInClient = GoogleSignIn.getClient(requireContext(), gso);
+    }
+
+    private void signInToGoogle() {
+        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_SIGN_IN);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == RC_SIGN_IN) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            if (task.isSuccessful()) {
+                GoogleSignInAccount account = task.getResult();
+                if (account != null) {
+                    // Persist account for Smart Commute
+                    SharedPreferences prefs = requireActivity()
+                            .getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
+                    prefs.edit()
+                            .putString("googleAccountName", account.getEmail())
+                            .apply();
+
+                    // Show simple confirmation dialog / toast instead of changing status TextView
+                    Toast.makeText(requireContext(),
+                            "Signed in to " + account.getEmail(),
+                            Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(requireContext(), "Google Sign-In failed", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+
 
 
     private void updateMirrorLocation(String mirrorIp, String city) {
@@ -381,6 +449,13 @@ public class MirrorStatusFragment extends Fragment {
         SharedPreferences prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
         prefs.edit().putString("selectedMirrorIp", ip).putString("selectedMirrorName", name).apply();
 
+        // Send the last saved city immediately
+        String lastCity = prefs.getString("selectedCity", null);
+        if (lastCity != null) {
+            updateMirrorLocation(ip, lastCity);
+        }
+
+        // Fetch mirror status as before...
         Request request = new Request.Builder()
                 .url("http://" + ip + ":8081/status")
                 .build();
