@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     app:cardCornerRadius="25dp"
+    app:cardBackgroundColor="#838383"
     android:layout_gravity="center">
 
     <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/formConstraintLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/gradient_card_view"

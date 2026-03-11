@@ -1,16 +1,20 @@
 package com.example.mirrormirrorandroid;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -18,18 +22,29 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.common.api.Scope;
+import com.google.android.gms.tasks.Task;
+import com.google.api.services.calendar.CalendarScopes;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class MirrorStatusFragment extends Fragment {
@@ -48,6 +63,38 @@ public class MirrorStatusFragment extends Fragment {
 
     private Handler handler = new Handler();
     private String selectedMirrorIp = null;
+
+    private Button btnConnectGoogle;
+    private GoogleSignInClient mGoogleSignInClient;
+    private static final int RC_SIGN_IN = 1001;
+
+
+    private Spinner spinnerCities;
+    private final String[] cities = {
+            "New York", "Los Angeles", "São Paulo", "Dublin", "Berlin",
+            "Moscow", "Tokyo", "Dubai", "Sydney", "Cape Town"
+    };
+
+    private static class LatLon {
+        final double lat;
+        final double lon;
+        LatLon(double lat, double lon) { this.lat = lat; this.lon = lon; }
+    }
+
+    private final Map<String, LatLon> cityCoordinates = new HashMap<String, LatLon>() {{
+        put("New York", new LatLon(40.776676, -73.971321));
+        put("Los Angeles", new LatLon(34.052235, -118.243683));
+        put("São Paulo", new LatLon(-23.55052, -46.633308));
+        put("Dublin", new LatLon(53.349805, -6.26031));
+        put("Berlin", new LatLon(52.520008, 13.404954));
+        put("Moscow", new LatLon(55.751244, 37.618423));
+        put("Tokyo", new LatLon(35.682839, 139.759455));
+        put("Dubai", new LatLon(25.276987, 55.296249));
+        put("Sydney", new LatLon(-33.86882, 151.209296));
+        put("Cape Town", new LatLon(-33.92487, 18.424055));
+    }};
+
+
 
     public MirrorStatusFragment() {
         super(R.layout.fragment_mirror_status);
@@ -128,53 +175,182 @@ public class MirrorStatusFragment extends Fragment {
 
         // --- Initialize UI ---
         txtConnectionStatus = view.findViewById(R.id.txtConnectionStatus);
+        connectionIndicator = view.findViewById(R.id.connectionIndicator);
+        listViewMirrors = view.findViewById(R.id.listViewMirrors);
+        spinnerCities = view.findViewById(R.id.spinnerCities);
+        loading = view.findViewById(R.id.loading);
         txtMirrorId = view.findViewById(R.id.txtMirrorId);
         txtIpAddress = view.findViewById(R.id.txtIpAddress);
         txtUptime = view.findViewById(R.id.txtUptime);
         txtModules = view.findViewById(R.id.txtModules);
         txtLastUpdate = view.findViewById(R.id.txtLastUpdate);
-        connectionIndicator = view.findViewById(R.id.connectionIndicator);
-        loading = view.findViewById(R.id.loading);
-        listViewMirrors = view.findViewById(R.id.listViewMirrors);
+
+
+        // Clear old mirrors and reset flags
+        mirrorNames.clear();
+        mirrorIps.clear();
+        mirrorFound.set(false);
+        selectedMirrorIp = null;
+
+        txtConnectionStatus.setText("Status: Disconnected");
+        setIndicatorState("disconnected");
 
         adapter = new ArrayAdapter<>(requireContext(), R.layout.list_items, R.id.txtMirrorName, mirrorNames);
         listViewMirrors.setAdapter(adapter);
 
-        listViewMirrors.setOnItemClickListener((parent, itemView, position, id) -> {
-            selectedMirrorIp = mirrorIps.get(position);
-            updateMirrorInfo(selectedMirrorIp, mirrorNames.get(position));
-        });
-
+        // Start discovery
         nsdManager = (NsdManager) requireContext().getSystemService(Context.NSD_SERVICE);
 
         txtConnectionStatus.setText("Status: Disconnected");
         setIndicatorState("disconnected");
 
+        listViewMirrors.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                selectedMirrorIp = mirrorIps.get(position); // get IP of selected mirror
+                String mirrorName = mirrorNames.get(position);
+                updateMirrorInfo(selectedMirrorIp, mirrorName); // connect & fetch status
+            }
+        });
+
+        // --- Google Sign-In setup ---
+        btnConnectGoogle = view.findViewById(R.id.btnConnectGoogle);
+        setupGoogleSignIn();
+
+        btnConnectGoogle.setOnClickListener(v -> signInToGoogle());
+
+
+
         // --- Restore last selected mirror ---
+//        selectedMirrorIp = prefs.getString("selectedMirrorIp", null);
+//
+//        if (selectedMirrorIp != null) {
+//            // Pre-fill list with placeholder
+//            mirrorIps.add(selectedMirrorIp);
+//            mirrorNames.add("Loading...");
+//            adapter.notifyDataSetChanged();
+//
+//            // Try to reach the last selected mirror
+//            verifyMirrorReachable(selectedMirrorIp);
+//        } else {
+//            // No saved mirror, start discovery
+//            startDiscovery();
+//        }
+        startDiscovery();
+
+        // --- Setup spinner ---
+        ArrayAdapter<String> cityAdapter = new ArrayAdapter<>(
+                requireContext(),
+                R.layout.spinner_item_dark,
+                R.id.txtSpinnerItem,
+                cities
+        );
+        cityAdapter.setDropDownViewResource(R.layout.spinner_item_dark);
+        spinnerCities.setAdapter(cityAdapter);
+        spinnerCities.setPopupBackgroundResource(R.drawable.spinner_popup_background_dark);
+
+// Restore last selected city
         SharedPreferences prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
-        selectedMirrorIp = prefs.getString("selectedMirrorIp", null);
+        String lastCity = prefs.getString("selectedCity", "New York");
+        int position = java.util.Arrays.asList(cities).indexOf(lastCity);
+        spinnerCities.setSelection(position);
 
-        if (selectedMirrorIp != null) {
-            // Pre-fill list with placeholder
-            mirrorIps.add(selectedMirrorIp);
-            mirrorNames.add("Loading...");
-            adapter.notifyDataSetChanged();
+// City selection listener
+        spinnerCities.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+                String selectedCity = cities[pos];
 
-            // Try to reach the last selected mirror
-            verifyMirrorReachable(selectedMirrorIp);
-        } else {
-            // No saved mirror, start discovery
-            startDiscovery();
-        }
+                // Persist selection
+                prefs.edit().putString("selectedCity", selectedCity).apply();
+
+                // Send location to mirror if one is selected
+                if (selectedMirrorIp != null) {
+                    updateMirrorLocation(selectedMirrorIp, selectedCity);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {}
+        });
+
+
 
         // Start periodic polling
         handler.post(statusPoller);
     }
 
+    private void setupGoogleSignIn() {
+        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                .requestEmail()
+                .requestScopes(new Scope(CalendarScopes.CALENDAR_READONLY))
+                .build();
+        mGoogleSignInClient = GoogleSignIn.getClient(requireContext(), gso);
+    }
 
-    private void verifyMirrorReachable(String ip) {
+    private void signInToGoogle() {
+        Intent signInIntent = mGoogleSignInClient.getSignInIntent();
+        startActivityForResult(signInIntent, RC_SIGN_IN);
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == RC_SIGN_IN) {
+            Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+            if (task.isSuccessful()) {
+                GoogleSignInAccount account = task.getResult();
+                if (account != null) {
+                    // Persist account for Smart Commute
+                    SharedPreferences prefs = requireActivity()
+                            .getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
+                    prefs.edit()
+                            .putString("googleAccountName", account.getEmail())
+                            .apply();
+
+                    // Show simple confirmation dialog / toast instead of changing status TextView
+                    Toast.makeText(requireContext(),
+                            "Signed in to " + account.getEmail(),
+                            Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(requireContext(), "Google Sign-In failed", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+
+
+
+    private void updateMirrorLocation(String mirrorIp, String city) {
+        // Safety check: valid mirror and coordinates exist
+        if (mirrorIp == null || !cityCoordinates.containsKey(city)) return;
+
+        loading.setVisibility(View.VISIBLE);
+
+        LatLon coords = cityCoordinates.get(city);
+
+        JSONObject json = new JSONObject();
+        try {
+            // Send both lat/lon and the city name
+            json.put("lat", coords.lat);
+            json.put("lon", coords.lon);
+            json.put("city", city);  // <-- add this line
+        } catch (Exception e) {
+            e.printStackTrace();
+            loading.setVisibility(View.GONE);
+            return;
+        }
+
+        RequestBody body = RequestBody.create(
+                json.toString(),
+                okhttp3.MediaType.get("application/json; charset=utf-8")
+        );
+
         Request request = new Request.Builder()
-                .url("http://" + ip + ":8081/status")
+                .url("http://" + mirrorIp + ":8081/location") // your server endpoint
+                .post(body)
                 .build();
 
         client.newCall(request).enqueue(new Callback() {
@@ -182,11 +358,8 @@ public class MirrorStatusFragment extends Fragment {
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
-                        handleMirrorDisconnect();
-                        mirrorNames.clear();  // remove any placeholder
-                        mirrorIps.clear();
-                        adapter.notifyDataSetChanged();
-                        startDiscovery();    // restart discovery automatically
+                        loading.setVisibility(View.GONE);
+                        Toast.makeText(getContext(), "Failed to update location", Toast.LENGTH_SHORT).show();
                     });
                 }
             }
@@ -195,20 +368,61 @@ public class MirrorStatusFragment extends Fragment {
             public void onResponse(@NonNull Call call, @NonNull Response response) {
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
+                        loading.setVisibility(View.GONE);
                         if (response.isSuccessful()) {
-                            updateMirrorInfo(ip, "Last Selected Mirror");
+                            Toast.makeText(getContext(), "Location updated: " + city, Toast.LENGTH_SHORT).show();
+                            System.out.println("Location successfully sent: " + json.toString());
                         } else {
-                            handleMirrorDisconnect();
-                            mirrorNames.clear();
-                            mirrorIps.clear();
-                            adapter.notifyDataSetChanged();
-                            startDiscovery();
+                            Toast.makeText(getContext(), "Failed to update location", Toast.LENGTH_SHORT).show();
                         }
                     });
                 }
             }
         });
     }
+
+
+
+
+
+
+//    private void verifyMirrorReachable(String ip) {
+//        Request request = new Request.Builder()
+//                .url("http://" + ip + ":8081/status")
+//                .build();
+//
+//        client.newCall(request).enqueue(new Callback() {
+//            @Override
+//            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+//                if (getActivity() != null) {
+//                    getActivity().runOnUiThread(() -> {
+//                        handleMirrorDisconnect();
+//                        mirrorNames.clear();  // remove any placeholder
+//                        mirrorIps.clear();
+//                        adapter.notifyDataSetChanged();
+//                        startDiscovery();    // restart discovery automatically
+//                    });
+//                }
+//            }
+//
+//            @Override
+//            public void onResponse(@NonNull Call call, @NonNull Response response) {
+//                if (getActivity() != null) {
+//                    getActivity().runOnUiThread(() -> {
+//                        if (response.isSuccessful()) {
+//                            updateMirrorInfo(ip, "Last Selected Mirror");
+//                        } else {
+//                            handleMirrorDisconnect();
+//                            mirrorNames.clear();
+//                            mirrorIps.clear();
+//                            adapter.notifyDataSetChanged();
+//                            startDiscovery();
+//                        }
+//                    });
+//                }
+//            }
+//        });
+//    }
 
 
     private void handleMirrorDisconnect() {
@@ -235,6 +449,13 @@ public class MirrorStatusFragment extends Fragment {
         SharedPreferences prefs = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE);
         prefs.edit().putString("selectedMirrorIp", ip).putString("selectedMirrorName", name).apply();
 
+        // Send the last saved city immediately
+        String lastCity = prefs.getString("selectedCity", null);
+        if (lastCity != null) {
+            updateMirrorLocation(ip, lastCity);
+        }
+
+        // Fetch mirror status as before...
         Request request = new Request.Builder()
                 .url("http://" + ip + ":8081/status")
                 .build();

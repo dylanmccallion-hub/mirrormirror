@@ -25,9 +25,23 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    // --- Add this to fix duplicate META-INF warnings ---
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt"
+            )
+        }
     }
 }
 
@@ -35,7 +49,14 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
-// (Optional) Places API for autocomplete
+
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
+    implementation("com.google.api-client:google-api-client-android:1.34.1")
+    implementation("com.google.api-client:google-api-client-gson:1.34.1")
+    implementation("com.google.apis:google-api-services-calendar:v3-rev411-1.25.0")
+    implementation("com.google.http-client:google-http-client-android:1.41.8") // ✅ add this
+
+    // (Optional) Places API for autocomplete
     implementation ("com.google.android.libraries.places:places:3.3.0")
     implementation("com.squareup.okhttp3:okhttp:4.11.0")
     implementation(libs.appcompat)

@@ -29,7 +29,7 @@ import java.util.Locale;
 
 public class ToDoListFragment extends Fragment {
 
-    private Button btnAdd, submitListButton;
+    private Button btnAdd;
     private ListView listView;
     private ArrayList<ToDoItem> items;
     private ArrayAdapter<ToDoItem> adapter;
@@ -55,10 +55,10 @@ public class ToDoListFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         btnAdd = view.findViewById(R.id.btnAdd);
-        submitListButton = view.findViewById(R.id.submitListButton);
         listView = view.findViewById(R.id.listView);
 
         items = new ArrayList<>();
+        loadToDoList(); // load saved items
 
         adapter = new ArrayAdapter<ToDoItem>(requireContext(), R.layout.list_item, items) {
             @NonNull
@@ -70,7 +70,6 @@ public class ToDoListFragment extends Fragment {
                 }
 
                 ToDoItem item = getItem(position);
-
                 TextView title = itemView.findViewById(R.id.itemTitle);
                 TextView due = itemView.findViewById(R.id.itemDueDate);
 
@@ -82,20 +81,15 @@ public class ToDoListFragment extends Fragment {
                     SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
                     try {
                         Date dueDate = sdf.parse(item.dueDate);
-                        Date today = sdf.parse(sdf.format(new Date())); // today with time stripped
-
-                        // calculate tomorrow by adding one day in milliseconds
+                        Date today = sdf.parse(sdf.format(new Date()));
                         Date tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
                         if (dueDate != null) {
                             if (!dueDate.after(today)) {
-                                // due today or past -> red
                                 due.setTextColor(getResources().getColor(android.R.color.holo_red_light));
                             } else if (dueDate.equals(tomorrow)) {
-                                // due tomorrow -> yellow
                                 due.setTextColor(getResources().getColor(android.R.color.holo_orange_light));
                             } else {
-                                // future beyond tomorrow -> white
                                 due.setTextColor(getResources().getColor(R.color.white));
                             }
                         }
@@ -107,90 +101,126 @@ public class ToDoListFragment extends Fragment {
                     due.setText("");
                 }
 
-
                 return itemView;
             }
         };
 
-
         listView.setAdapter(adapter);
 
-        // --- Add button launches floating input dialog ---
+        // --- Add new item ---
         btnAdd.setOnClickListener(v -> {
             FloatingInputDialog dialog = new FloatingInputDialog((text, dueDate) -> {
                 items.add(new ToDoItem(text, dueDate));
                 adapter.notifyDataSetChanged();
-            },
-                    R.layout.floating_input_bar
-            );
+                saveToDoList(); // persist immediately
+                sendToMirrorIfSelected(); // send automatically
+            }, R.layout.floating_input_bar);
             dialog.show(getParentFragmentManager(), "floating_input_bar");
         });
 
-        submitListButton.setOnClickListener(v -> {
-            // Get selected mirror IP from SharedPreferences
-            String mirrorIp = requireActivity()
-                    .getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
-                    .getString("selectedMirrorIp", null);
-
-            if (mirrorIp == null) {
-                Toast.makeText(requireContext(), "No mirror selected", Toast.LENGTH_SHORT).show();
-                return;
-            }
-
-            // Prepare JSON array of tasks
-            JSONArray jsonArray = new JSONArray();
-            for (ToDoItem item : items) {
-                JSONObject obj = new JSONObject();
-                try {
-                    obj.put("title", item.title);
-                    obj.put("dueDate", item.dueDate != null ? item.dueDate : JSONObject.NULL);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-                jsonArray.put(obj);
-            }
-
-            JSONObject payload = new JSONObject();
-            try {
-                payload.put("list", jsonArray);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            // Send REST POST to the discovered mirror
-            new Thread(() -> {
-                HttpURLConnection conn = null;
-                try {
-                    URL url = new URL("http://" + mirrorIp + ":8081/todolist");
-                    conn = (HttpURLConnection) url.openConnection();
-                    conn.setRequestMethod("POST");
-                    conn.setRequestProperty("Content-Type", "application/json");
-                    conn.setDoOutput(true);
-
-                    OutputStream os = conn.getOutputStream();
-                    os.write(payload.toString().getBytes());
-                    os.flush();
-                    os.close();
-
-                    int responseCode = conn.getResponseCode();
-                    System.out.println("POST Response Code :: " + responseCode);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    if (conn != null) conn.disconnect();
-                }
-            }).start();
-
-            Toast.makeText(requireContext(), "List sent to Mirror", Toast.LENGTH_SHORT).show();
-        });
-
-
-        // --- Long press to delete items ---
+        // --- Long press to delete ---
         listView.setOnItemLongClickListener((parent, v1, position, id) -> {
             ToDoItem removed = items.remove(position);
             adapter.notifyDataSetChanged();
+            saveToDoList(); // persist after deletion
+            sendToMirrorIfSelected(); // send updated list
             Toast.makeText(requireContext(), "Deleted: " + removed.title, Toast.LENGTH_SHORT).show();
             return true;
         });
+
+        // --- Send saved list to mirror on startup ---
+        sendToMirrorIfSelected();
+    }
+
+    // --- Persist list to SharedPreferences ---
+    private void saveToDoList() {
+        JSONArray jsonArray = new JSONArray();
+        for (ToDoItem item : items) {
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put("title", item.title);
+                obj.put("dueDate", item.dueDate != null ? item.dueDate : JSONObject.NULL);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            jsonArray.put(obj);
+        }
+        requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
+                .edit()
+                .putString("todoList", jsonArray.toString())
+                .apply();
+    }
+
+    // --- Load list from SharedPreferences ---
+    private void loadToDoList() {
+        String jsonStr = requireActivity().getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
+                .getString("todoList", null);
+        if (jsonStr != null) {
+            try {
+                JSONArray jsonArray = new JSONArray(jsonStr);
+                for (int i = 0; i < jsonArray.length(); i++) {
+                    JSONObject obj = jsonArray.getJSONObject(i);
+                    String title = obj.optString("title");
+                    String dueDate = obj.optString("dueDate", null);
+                    items.add(new ToDoItem(title, dueDate));
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    // --- Send list to mirror if a mirror is selected ---
+    private void sendToMirrorIfSelected() {
+        String mirrorIp = requireActivity()
+                .getSharedPreferences("MirrorPrefs", Context.MODE_PRIVATE)
+                .getString("selectedMirrorIp", null);
+
+        if (mirrorIp == null) {
+            Toast.makeText(requireContext(), "No mirror selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        JSONArray jsonArray = new JSONArray();
+        for (ToDoItem item : items) {
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put("title", item.title);
+                obj.put("dueDate", item.dueDate != null ? item.dueDate : JSONObject.NULL);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            jsonArray.put(obj);
+        }
+
+        JSONObject payload = new JSONObject();
+        try {
+            payload.put("list", jsonArray);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        new Thread(() -> {
+            HttpURLConnection conn = null;
+            try {
+                URL url = new URL("http://" + mirrorIp + ":8081/todolist");
+                conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("POST");
+                conn.setRequestProperty("Content-Type", "application/json");
+                conn.setDoOutput(true);
+
+                OutputStream os = conn.getOutputStream();
+                os.write(payload.toString().getBytes());
+                os.flush();
+                os.close();
+
+                int responseCode = conn.getResponseCode();
+                System.out.println("POST Response Code :: " + responseCode);
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (conn != null) conn.disconnect();
+            }
+        }).start();
     }
 }

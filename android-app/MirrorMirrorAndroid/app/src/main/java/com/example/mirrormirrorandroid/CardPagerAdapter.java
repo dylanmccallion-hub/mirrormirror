@@ -18,12 +18,15 @@ public class CardPagerAdapter extends FragmentStateAdapter {
             case 0: return new MirrorStatusFragment();
             case 1: return new ToDoListFragment();
             case 2: return new MirrorMapsFragment();
+            case 3: return new ComplimentsFragment();
+            case 4: return new HealthFragment();
+            case 5: return new SmartCommuteFragment();
             default: return new MirrorStatusFragment();
         }
     }
 
     @Override
     public int getItemCount() {
-        return 3; // number of cards/fragments
+        return 6; // number of cards/fragments
     }
 }
