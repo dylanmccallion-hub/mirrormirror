@@ -1,0 +1,55 @@
+/* Match MagicMirror look */
+.MMM-SmartCommute {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #fff;
+  text-align: left;
+  line-height: 1.4em;
+}
+
+/* Header */
+.MMM-SmartCommute .module-header {
+  font-size: 0.85em;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: #aaa;
+  border-bottom: 1px solid #666;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/* List */
+.MMM-SmartCommute ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Items */
+.MMM-SmartCommute li {
+  font-size: 0.9em;
+  color: #fff;
+  padding: 2px 0;
+  transition: opacity 0.5s ease-in-out;
+}
+
+/* Dimmed text (optional future use) */
+.MMM-SmartCommute li.dimmed {
+  color: #888;
+}
+
+/* Label styling (the bold part like "Location:") */
+.MMM-SmartCommute li strong {
+  font-weight: 500;
+  color: #aaa;
+}
+
+/* Align module width to others on the right */
+.region.right .MMM-SmartCommute {
+  width: 250px;
+}
+
+/* Urgency Colours */
+
+.MMM-SmartCommute .urgent-green { color: #66ff66; }    /* green */
+.MMM-SmartCommute .urgent-orange { color: #ffcc33; }   /* orange/yellow */
+.MMM-SmartCommute .urgent-red { color: #ff6666; }      /* red */
