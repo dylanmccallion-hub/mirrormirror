@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+  <head>
+    <title>MagicMirror²</title>
+    <meta name="google" content="notranslate" />
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+    <link rel="stylesheet" type="text/css" href="css/main.css" />
+    <link rel="stylesheet" type="text/css" href="css/roboto.css" />
+    <link rel="stylesheet" type="text/css" href="node_modules/animate.css/animate.min.css" />
+    <!-- custom.css is loaded by the loader.js to make sure it's loaded after the module css files. -->
+
+    <script type="text/javascript">
+      window.mmVersion = "#VERSION#";
+      window.mmTestMode = "#TESTMODE#";
+    </script>
+
+	<style>
+	  #splash-screen {
+	    position: fixed;
+	    top: 0; left: 0;
+	    width: 100vw; height: 100vh;
+	    background-color: black;
+	    display: flex;
+	    flex-direction: column;
+	    justify-content: center;
+	    align-items: center;
+	    color: white;
+	    z-index: 9999;
+	    opacity: 1;
+	    transition: opacity 1s ease;
+	  }
+
+	  #splash-logo {
+	    max-width: 50%;
+	    height: auto;
+	    margin-bottom: 30px;
+	    animation: fadeIn 1s ease forwards;
+	  }
+
+	  #splash-message {
+	    font-size: 2em;
+	    margin-bottom: 20px;
+	    animation: fadeIn 1s ease 0.5s forwards;
+	    opacity: 0;
+	  }
+
+	  #splash-bar-container {
+	    width: 60%;
+	    height: 20px;
+	    background: #333;
+	    border-radius: 10px;
+	    overflow: hidden;
+	  }
+
+	  #splash-bar {
+	    width: 0%;
+	    height: 100%;
+	    background: linear-gradient(90deg, #555555, #ffffff);
+	    animation: loadingBar 4s linear forwards;
+	  }
+
+	  @keyframes fadeIn {
+	    to { opacity: 1; }
+	  }
+
+	  @keyframes loadingBar {
+	    to { width: 100%; }
+	  }
+	</style>
+
+  </head>
+  <body>
+    <!-- Splash Screen -->
+    <div id="splash-screen">
+      <img src="" alt="Magic Mirror" id="splash-logo">
+      <div id="splash-message">Loading...</div>
+      <div id="splash-bar-container">
+        <div id="splash-bar"></div>
+      </div>
+    </div>
+
+    <div class="region fullscreen below"><div class="container"></div></div>
+    <div class="region top bar">
+      <div class="container"></div>
+      <div class="region top left"><div class="container"></div></div>
+      <div class="region top center"><div class="container"></div></div>
+      <div class="region top right"><div class="container"></div></div>
+    </div>
+    <div class="region upper third"><div class="container"></div></div>
+    <div class="region middle center"><div class="container"></div></div>
+    <div class="region lower third">
+      <div class="container"><br /></div>
+    </div>
+    <div class="region bottom bar">
+      <div class="container"></div>
+      <div class="region bottom left"><div class="container"></div></div>
+      <div class="region bottom center"><div class="container"></div></div>
+      <div class="region bottom right"><div class="container"></div></div>
+    </div>
+    <div class="region fullscreen above"><div class="container"></div></div>
+    <script type="text/javascript" src="socket.io/socket.io.js"></script>
+    <script type="text/javascript" src="node_modules/nunjucks/browser/nunjucks.min.js"></script>
+    <script type="text/javascript" src="js/defaults.js"></script>
+    <script type="text/javascript" src="#CONFIG_FILE#"></script>
+    <script type="text/javascript" src="js/vendor.js"></script>
+    <script type="text/javascript" src="modules/default/defaultmodules.js"></script>
+    <script type="text/javascript" src="modules/default/utils.js"></script>
+    <script type="text/javascript" src="js/logger.js"></script>
+    <script type="text/javascript" src="translations/translations.js"></script>
+    <script type="text/javascript" src="js/translator.js"></script>
+    <script type="text/javascript" src="js/class.js"></script>
+    <script type="text/javascript" src="js/module.js"></script>
+    <script type="text/javascript" src="js/loader.js"></script>
+    <script type="text/javascript" src="js/socketclient.js"></script>
+    <script type="text/javascript" src="js/animateCSS.js"></script>
+    <script type="text/javascript" src="js/positions.js"></script>
+    <script type="text/javascript" src="js/main.js"></script>
+
+	<script>
+	  document.addEventListener("DOMContentLoaded", () => {
+	    // Array of logo filenames inside your "logos" folder
+	    const logos = [
+	      "modules/custom-logos/cyberdyne.png",
+	      "modules/custom-logos/tyrell_corp.png",
+	      "modules/custom-logos/vault_tec.png",
+	      "modules/custom-logos/umbrella.png",
+	      "modules/custom-logos/empire.png",
+	      "modules/custom-logos/wayne.png",
+	      "modules/custom-logos/stark.png"
+	    ];
+
+	    // Pick one randomly
+	    const selectedLogo = logos[Math.floor(Math.random() * logos.length)];
+
+	    // Set it to the img element
+	    document.getElementById("splash-logo").src = selectedLogo;
+
+	    // Fade out logic
+	    const splash = document.getElementById("splash-screen");
+	    setTimeout(() => {
+	      splash.style.opacity = 0;
+	      setTimeout(() => splash.remove(), 1000);
+	    }, 4000); // match your loading bar duration
+	  });
+	</script>
+
+	<script>
+	  document.addEventListener("DOMContentLoaded", () => {
+	    // Wait until all modules are ready
+	    // Here we just use a safe max delay for demonstration
+	    const splash = document.getElementById("splash-screen");
+	    setTimeout(() => {
+	      splash.style.opacity = 0;
+	      setTimeout(() => splash.remove(), 1000); // Remove after fade
+	    }, 4000); // match your loading bar duration
+	  });
+	</script>
+
+  </body>
+</html>
