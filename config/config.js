@@ -19,7 +19,7 @@ let config = {
         { module: "compliments", position: "lower_third" },
         { 
             module: "newsfeed", 
-            position: "bottom_bar", 
+            position: "bottom_center", 
             config: { 
                 feeds: [
                     { title: "New York Times", url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" }
@@ -30,6 +30,14 @@ let config = {
                 broadcastNewsUpdates: true
             } 
         },
+	{
+  	    module: "MMM-Temperature",
+  	    position: "bottom_right"
+	},
+	{
+	    module: "MMM-Humidity",
+	    position: "bottom_left"
+	},
 
         // Page 0 modules
         {
@@ -51,9 +59,9 @@ let config = {
 
         // Page 1 modules
         { module: "MMM-ToDoList", position: "top_left", config: {} },
-        { module: "MMM-RoutePlanner", position: "top_right", config: {} },
+        { module: "MMM-RoutePlanner", position: "top_left", config: {} },
+	{ module: "MMM-SmartCommute", position: "top_right", config: {} },
         { module: "MMM-Health", position: "top_right", config: {} },
-        { module: "MMM-SmartCommute", position: "bottom_left", config: {} },
 
         // Hidden bridges (can stay here; not on any page)
         { module: "MMM-WeatherBridge" },
@@ -67,13 +75,29 @@ let config = {
                     ["calendar", "weather", "weather"], // Page 0
                     ["MMM-ToDoList", "MMM-RoutePlanner", "MMM-Health", "MMM-SmartCommute"] // Page 1
                 ],
-                fixed: ["clock", "compliments", "newsfeed"],
-                timings: {
-		    default: 5000
-		},
+                fixed: ["MMM-page-indicator","clock", "compliments", "newsfeed", "MMM-Temperature", 
+			"MMM-Humidity"],
 		homepage: 0
             }
-        }
+        },
+
+	{
+  	  module: "MMM-Remote-Control",
+  	  position: "bottom_left",
+  	  config: {
+    	  customCommand: {}
+  	  }
+	},
+
+        {
+            module: 'MMM-page-indicator',
+            position: 'bottom_center',
+            config: {
+            	activeBright: true,
+		style: "dots",
+		maxPages: 10
+            }
+    	},
     ]
 };
 

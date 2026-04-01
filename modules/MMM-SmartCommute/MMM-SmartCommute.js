@@ -1,7 +1,7 @@
 Module.register("MMM-SmartCommute", {
   defaults: {
     header: "Smart Commute",
-    fade: true,
+    fade: false,
     fadePoint: 0.25,
     animationSpeed: 500
   },
@@ -14,9 +14,9 @@ Module.register("MMM-SmartCommute", {
 
     // Live countdown interval
     this.countdownInterval = setInterval(() => {
-      if (this.localLeaveMinutes !== null) {
+      if (this.localLeaveMinutes !== null && this.listContainer) {
         this.localLeaveMinutes = Math.max(0, this.localLeaveMinutes - 1);
-        this.updateDom(this.config.animationSpeed);
+        this.updateLeaveTime();
       }
     }, 60000); // every 1 min
 
@@ -30,39 +30,51 @@ Module.register("MMM-SmartCommute", {
       this.smartCommute = payload;
       this.dataLoaded = true;
 
-    // Compute minutes elapsed since last update
+      // Compute minutes elapsed since last update
       const lastUpdate = new Date(payload.lastUpdate);
       const now = new Date();
       const minsElapsed = Math.floor((now - lastUpdate) / 60000);
 
-    // Adjust leaveInMinutes for elapsed time
+      // Adjust leaveInMinutes for elapsed time
       const rawMins = Number(payload.leaveInMinutes);
       this.localLeaveMinutes = Math.max(0, rawMins - minsElapsed);
 
-      this.updateDom(this.config.animationSpeed);
-
+      if (this.listContainer) {
+        this.updateList();
+      }
     }
   },
 
   getDom() {
-    const wrapper = document.createElement("div");
-    wrapper.className = "MMM-SmartCommute";
+    if (!this.wrapper) {
+      this.wrapper = document.createElement("div");
+      this.wrapper.className = "MMM-SmartCommute";
 
-    const header = document.createElement("div");
-    header.className = "module-header";
-    header.textContent = this.config.header;
-    wrapper.appendChild(header);
+      const header = document.createElement("div");
+      header.className = "module-header";
+      header.textContent = this.config.header;
+      this.wrapper.appendChild(header);
 
-    if (!this.dataLoaded) {
-      const loading = document.createElement("div");
-      loading.className = "dimmed light small";
-      loading.textContent = "Loading ...";
-      wrapper.appendChild(loading);
-      return wrapper;
+      this.listContainer = document.createElement("ul");
+      this.listContainer.className = "smart-commute-list";
+      this.wrapper.appendChild(this.listContainer);
     }
 
-    const ul = document.createElement("ul");
-    ul.className = "smart-commute-list";
+    if (this.dataLoaded) {
+      this.updateList();
+    } else {
+      this.listContainer.innerHTML = "";
+      const loading = document.createElement("li");
+      loading.className = "dimmed light small";
+      loading.textContent = "Loading ...";
+      this.listContainer.appendChild(loading);
+    }
+
+    return this.wrapper;
+  },
+
+  updateList() {
+    this.listContainer.innerHTML = "";
 
     const fields = [
       { label: "Next Event", key: "eventTitle" },
@@ -105,8 +117,8 @@ Module.register("MMM-SmartCommute", {
         }
 
         value.textContent = text;
-
         value.classList.remove("urgent-green", "urgent-orange", "urgent-red");
+
         if (mins !== null && !isNaN(mins)) {
           if (mins <= 0) value.classList.add("urgent-red");
           else if (mins <= 15) value.classList.add("urgent-orange");
@@ -117,18 +129,41 @@ Module.register("MMM-SmartCommute", {
       }
 
       li.appendChild(value);
-      ul.appendChild(li);
+      this.listContainer.appendChild(li);
     });
+  },
 
-    wrapper.appendChild(ul);
-    return wrapper;
+  updateLeaveTime() {
+    if (!this.listContainer) return;
+    const leaveLi = this.listContainer.querySelectorAll("li")[4]; // 5th item
+    if (!leaveLi) return;
+
+    let mins = this.localLeaveMinutes;
+    let text = "N/A";
+
+    if (mins !== null && !isNaN(mins)) {
+      if (mins <= 0) text = "Leave now";
+      else if (mins < 60) text = `in ${mins} mins`;
+      else {
+        const hours = Math.floor(mins / 60);
+        const remainder = mins % 60;
+        text = `in ${hours}h ${remainder}m`;
+      }
+    }
+
+    leaveLi.querySelector("span").textContent = text;
+    leaveLi.querySelector("span").classList.remove("urgent-green", "urgent-orange", "urgent-red");
+    if (mins !== null && !isNaN(mins)) {
+      if (mins <= 0) leaveLi.querySelector("span").classList.add("urgent-red");
+      else if (mins <= 15) leaveLi.querySelector("span").classList.add("urgent-orange");
+      else leaveLi.querySelector("span").classList.add("urgent-green");
+    }
   },
 
   getStyles() {
     return ["MMM-SmartCommute.css"];
   },
 
-  // Clear interval on shutdown
   stop() {
     if (this.countdownInterval) clearInterval(this.countdownInterval);
   }

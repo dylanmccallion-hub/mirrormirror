@@ -1,9 +1,6 @@
 Module.register("MMM-ToDoList", {
   defaults: {
-    header: "To-Do List",
-    fade: true,
-    fadePoint: 0.25, // start fading after 25%
-    animationSpeed: 500
+    header: "To-Do List"
   },
 
   start() {
@@ -15,81 +12,74 @@ Module.register("MMM-ToDoList", {
 
   socketNotificationReceived(notification, payload) {
     if (notification === "TODO_LIST_UPDATE") {
-      console.log("📡 Frontend received TODO_LIST_UPDATE:", payload);
-
-    // Always update list first
       this.list = Array.isArray(payload) ? payload : [];
       this.loaded = true;
 
-    // Force MagicMirror to update DOM
-      this.updateDom(this.config.animationSpeed);
-
+      if (this.listContainer) {
+        // Update only the list items
+        this.updateList();
+      }
     }
   },
 
+  getDom() {
+    if (!this.wrapper) {
+      this.wrapper = document.createElement("div");
+      this.wrapper.className = "MMM-ToDoList";
 
-getDom() {
-  const wrapper = document.createElement("div");
-  wrapper.className = "MMM-ToDoList";
+      // Header
+      const header = document.createElement("div");
+      header.className = "module-header";
+      header.textContent = this.config.header;
+      this.wrapper.appendChild(header);
 
-  // Header (MagicMirror style)
-  const header = document.createElement("div");
-  header.className = "module-header";
-  header.textContent = this.config.header;
-  wrapper.appendChild(header);
+      // List container
+      this.listContainer = document.createElement("ul");
+      this.listContainer.className = "todo-list";
+      this.wrapper.appendChild(this.listContainer);
 
-  if (!this.loaded) {
-    const loading = document.createElement("div");
-    loading.className = "dimmed light small";
-    loading.innerHTML = "Loading ...";
-    wrapper.appendChild(loading);
-    return wrapper;
-  }
+      this.loaded = true;
+    }
 
-  const ul = document.createElement("ul");
-  ul.className = "todo-list";
+    if (this.loaded) {
+      this.updateList();
+    }
 
-  this.list.forEach((item, index) => {
-    const li = document.createElement("li");
+    return this.wrapper;
+  },
 
-    // Fade like other modules
-    if (this.config.fade && this.list.length > 0) {
-      const startFade = this.list.length * this.config.fadePoint;
-      if (index >= startFade) {
-        const fadeSteps = this.list.length - startFade;
-        li.style.opacity = 1 - (index - startFade) / fadeSteps;
+  updateList() {
+    // Clear current list
+    this.listContainer.innerHTML = "";
+
+    // Render new items
+    this.list.forEach((item, index) => {
+      const li = document.createElement("li");
+
+      const title = document.createElement("span");
+      title.textContent = item.title;
+      li.appendChild(title);
+
+      if (item.dueDate) {
+        const due = document.createElement("span");
+        due.className = "dueDate";
+        due.textContent = `Due: ${item.dueDate}`;
+
+        const now = new Date();
+        const [day, month, year] = item.dueDate.split("/").map(Number);
+        const dueDateObj = new Date(year, month - 1, day);
+        const diffDays = Math.floor((dueDateObj - now) / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) due.classList.add("overdue");
+        else if (diffDays < 1) due.classList.add("due-soon");
+
+        li.appendChild(document.createElement("br"));
+        li.appendChild(due);
       }
-    }
 
-    const title = document.createElement("span");
-    title.textContent = item.title;
-    li.appendChild(title);
-
-    if (item.dueDate) {
-      const due = document.createElement("span");
-      due.className = "dueDate";
-      due.textContent = `Due: ${item.dueDate}`;
-
-      // 🔥 Determine urgency based on due date
-      const now = new Date();
-      const [day, month, year] = item.dueDate.split("/").map(Number);
-      const dueDateObj = new Date(year, month - 1, day);
-      const diffDays = Math.floor((dueDateObj - now) / (1000 * 60 * 60 * 24));
-
-      if (diffDays < 0) due.classList.add("overdue");
-      else if (diffDays < 1) due.classList.add("due-soon");
-
-      li.appendChild(document.createElement("br"));
-      li.appendChild(due);
-    }
-
-    ul.appendChild(li);
-  });
-
-  wrapper.appendChild(ul);
-  return wrapper;
-},
-
+      this.listContainer.appendChild(li);
+    });
+  },
 
   getStyles() {
     return ["MMM-ToDoList.css"];
