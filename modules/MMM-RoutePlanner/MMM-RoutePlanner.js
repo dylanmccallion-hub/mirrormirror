@@ -2,8 +2,7 @@ Module.register("MMM-RoutePlanner", {
   defaults: {
     header: "Route Planner",
     fade: true,
-    fadePoint: 0.25,
-    animationSpeed: 500
+    fadePoint: 0.25
   },
 
   start() {
@@ -18,30 +17,46 @@ Module.register("MMM-RoutePlanner", {
       console.log("📡 Frontend received ROUTE_INFO_UPDATE:", payload);
       this.route = payload;
       this.loaded = true;
-      this.updateDom(this.config.animationSpeed);
+
+      if (this.listContainer) {
+        this.updateRouteList();
+      }
     }
   },
 
   getDom() {
-    const wrapper = document.createElement("div");
-    wrapper.className = "MMM-RoutePlanner";
+    if (!this.wrapper) {
+      this.wrapper = document.createElement("div");
+      this.wrapper.className = "MMM-RoutePlanner";
 
-    // Header (MagicMirror style)
-    const header = document.createElement("div");
-    header.className = "module-header";
-    header.textContent = this.config.header;
-    wrapper.appendChild(header);
+      // Header
+      const header = document.createElement("div");
+      header.className = "module-header";
+      header.textContent = this.config.header;
+      this.wrapper.appendChild(header);
 
-    if (!this.loaded) {
-      const loading = document.createElement("div");
-      loading.className = "dimmed light small";
-      loading.innerHTML = "Waiting for route ...";
-      wrapper.appendChild(loading);
-      return wrapper;
+      // List container
+      this.listContainer = document.createElement("ul");
+      this.listContainer.className = "route-list";
+      this.wrapper.appendChild(this.listContainer);
     }
 
-    const ul = document.createElement("ul");
-    ul.className = "route-list";
+    if (this.loaded) {
+      this.updateRouteList();
+    } else {
+      // Show waiting message
+      this.listContainer.innerHTML = "";
+      const loading = document.createElement("li");
+      loading.className = "dimmed light small";
+      loading.textContent = "Waiting for route ...";
+      this.listContainer.appendChild(loading);
+    }
+
+    return this.wrapper;
+  },
+
+  updateRouteList() {
+    this.listContainer.innerHTML = "";
 
     const rows = [
       { label: "Route", value: this.route.routeTitle || "N/A" },
@@ -52,7 +67,7 @@ Module.register("MMM-RoutePlanner", {
     rows.forEach((row, index) => {
       const li = document.createElement("li");
 
-      // Fade like other MagicMirror list modules
+      // Fade like other MagicMirror modules (optional)
       if (this.config.fade && rows.length > 0) {
         const startFade = rows.length * this.config.fadePoint;
         if (index >= startFade) {
@@ -70,11 +85,8 @@ Module.register("MMM-RoutePlanner", {
 
       li.appendChild(label);
       li.appendChild(value);
-      ul.appendChild(li);
+      this.listContainer.appendChild(li);
     });
-
-    wrapper.appendChild(ul);
-    return wrapper;
   },
 
   getStyles() {
