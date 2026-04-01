@@ -131,9 +131,37 @@ public class MirrorStatusFragment extends Fragment {
 
     private final NsdManager.DiscoveryListener discoveryListener = new NsdManager.DiscoveryListener() {
         @Override public void onDiscoveryStarted(String regType) {}
-        @Override public void onServiceFound(NsdServiceInfo service) {
+        @Override
+        public void onServiceFound(NsdServiceInfo service) {
             if (service.getServiceType().contains("_magicmirror._tcp")) {
-                nsdManager.resolveService(service, resolveListener);
+                NsdManager.ResolveListener listener = new NsdManager.ResolveListener() {
+                    @Override public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {}
+                    @Override
+                    public void onServiceResolved(NsdServiceInfo serviceInfo) {
+                        if (getActivity() == null) return;
+
+                        getActivity().runOnUiThread(() -> {
+                            String mirrorIp = serviceInfo.getHost().getHostAddress();
+                            String mirrorName = serviceInfo.getServiceName();
+
+                            if (!mirrorIps.contains(mirrorIp)) {
+                                mirrorNames.add(mirrorName);
+                                mirrorIps.add(mirrorIp);
+                                adapter.notifyDataSetChanged();
+                            }
+
+                            if (!mirrorFound.get()) {
+                                selectedMirrorIp = mirrorIp;
+                                txtConnectionStatus.setText("Mirror Found: " + mirrorName);
+                                setIndicatorState("searching");
+                                mirrorFound.set(true);
+                                updateMirrorInfo(selectedMirrorIp, mirrorName);
+                            }
+                        });
+                    }
+                };
+
+                nsdManager.resolveService(service, listener);
             }
         }
         @Override public void onServiceLost(NsdServiceInfo service) {}
@@ -159,11 +187,15 @@ public class MirrorStatusFragment extends Fragment {
                     adapter.notifyDataSetChanged();
                 }
 
-                // Only update status indicator if we’re not already connected
-                if (!mirrorIp.equals(selectedMirrorIp)) {
+                // Only auto-select the first mirror
+                if (!mirrorFound.get()) {
+                    selectedMirrorIp = mirrorIp;
                     txtConnectionStatus.setText("Mirror Found: " + mirrorName);
                     setIndicatorState("searching");
                     mirrorFound.set(true);
+
+                    // Auto-fetch status
+                    updateMirrorInfo(selectedMirrorIp, mirrorName);
                 }
             });
         }
