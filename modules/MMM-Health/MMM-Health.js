@@ -7,15 +7,36 @@ Module.register("MMM-Health", {
     },
 
     start() {
-        this.dataLoaded = false;
-        this.healthData = { steps: 0, calories: 0 };
         console.log("✅ Starting MMM-Health frontend");
-        this.sendSocketNotification("GET_HEALTH_DATA");
+
+        this.ready = false;
+        this.queue = [];
+        this.dataLoaded = false;
+        this.healthData = { steps: 0, calories: 0, height: "N/A", weight: "N/A" };
+
+        // Notify helper we're ready
+        setTimeout(() => {
+            this.ready = true;
+            console.log("✅ MMM-Health frontend ready, sending PING_HELPER");
+            this.sendSocketNotification("PING_HELPER");
+
+            // Flush queued notifications
+            this.queue.forEach(item => this._handleNotification(item.notification, item.payload));
+            this.queue = [];
+        }, 100);
     },
 
     socketNotificationReceived(notification, payload) {
+        if (!this.ready) {
+            this.queue.push({ notification, payload });
+            return;
+        }
+        this._handleNotification(notification, payload);
+    },
+
+    _handleNotification(notification, payload) {
         if (notification === "HEALTH_UPDATE") {
-            console.log("📡 Frontend received HEALTH_UPDATE:", payload);
+            console.log("📡 Frontend handling HEALTH_UPDATE:", payload);
             this.healthData = payload;
             this.dataLoaded = true;
             this.updateDom(this.config.animationSpeed);
@@ -26,7 +47,6 @@ Module.register("MMM-Health", {
         const wrapper = document.createElement("div");
         wrapper.className = "MMM-Health";
 
-        // Header
         const header = document.createElement("div");
         header.className = "module-header";
         header.textContent = this.config.header || "Health";
@@ -35,16 +55,17 @@ Module.register("MMM-Health", {
         if (!this.dataLoaded) {
             const loading = document.createElement("div");
             loading.className = "dimmed light small";
-            loading.innerHTML = "Loading ...";
+            loading.textContent = "Loading ...";
             wrapper.appendChild(loading);
             return wrapper;
         }
 
         const ul = document.createElement("ul");
-
         const items = [
-            `Steps: ${this.healthData.steps || 0}`,
-            `Calories: ${this.healthData.calories || 0}`
+            `Steps Today: ${this.healthData.steps || 0}`,
+            `Calories: ${this.healthData.calories || 0}`,
+            `Height: ${this.healthData.height || "N/A"} cm`,
+            `Weight: ${this.healthData.weight || "N/A"} kg`
         ];
 
         items.forEach((text, index) => {

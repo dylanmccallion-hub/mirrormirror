@@ -1,9 +1,13 @@
 const NodeHelper = require("node_helper");
 const io = require("socket.io-client");
+const PersistedStateHelper = require("../helpers/persistedStateHelper"); // Node-only
 
 module.exports = NodeHelper.create({
   start() {
     console.log("🔗 MMM-Health helper connected to central server");
+
+    // Initialize persistence
+    this.stateHelper = new PersistedStateHelper(__dirname, "healthData.json");
 
     // Connect to central API websocket
     this.socket = io("http://localhost:8081");
@@ -12,26 +16,31 @@ module.exports = NodeHelper.create({
       console.log("🟢 Connected to central server via websocket");
     });
 
-    // Receive health push updates
+    // Listen for push updates from the server
     this.socket.on("HEALTH_PUSH_UPDATE", (data) => {
-      console.log("📥 PUSH UPDATE from server:", data);
-      this.sendSocketNotification("HEALTH_UPDATE", data);
+      const payload = {
+        steps: data.steps,
+        calories: data.calories,
+        height: data.height,
+        weight: data.weight
+      };
+
+      // Persist and send
+      this.stateHelper.set("healthData", payload);
+      this.sendSocketNotification("HEALTH_UPDATE", payload);
     });
   },
 
   socketNotificationReceived(notification, payload) {
-    if (notification === "GET_HEALTH_DATA") {
-      this.loadHealthData();
-    }
-  },
+    if (notification === "PING_HELPER") {
+      console.log("🟢 Frontend connected, PING received");
 
-  async loadHealthData() {
-    try {
-      const res = await fetch("http://localhost:8081/health");
-      const data = await res.json();
-      this.sendSocketNotification("HEALTH_UPDATE", data);
-    } catch (err) {
-      console.error("Error loading health data:", err);
+      // Send persisted data only now
+      const persisted = this.stateHelper.get("healthData");
+      if (persisted) {
+        console.log("📂 Sending persisted health data to frontend:", persisted);
+        this.sendSocketNotification("HEALTH_UPDATE", persisted);
+      }
     }
   }
 });

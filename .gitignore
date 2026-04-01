@@ -1,2 +1,8 @@
 modules/default/
 node_modules/
+# Runtime module data
+modules/MMM-Health/healthData.json
+modules/MMM-RoutePlanner/routeInfo.json
+modules/MMM-ToDoList/todoList.json
+modules/MMM-WeatherBridge/weatherLocation.json
+modules/MMM-SmartCommute/smartCommute.json

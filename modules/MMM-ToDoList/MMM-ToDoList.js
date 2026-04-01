@@ -16,9 +16,14 @@ Module.register("MMM-ToDoList", {
   socketNotificationReceived(notification, payload) {
     if (notification === "TODO_LIST_UPDATE") {
       console.log("📡 Frontend received TODO_LIST_UPDATE:", payload);
-      this.list = payload;
+
+    // Always update list first
+      this.list = Array.isArray(payload) ? payload : [];
       this.loaded = true;
+
+    // Force MagicMirror to update DOM
       this.updateDom(this.config.animationSpeed);
+
     }
   },
 
